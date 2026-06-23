@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>קורא הרגשות והחיישנים של המיקרוביט</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  :root{
+    --bg:#0a0a0c;
+    --panel:#14151a;
+    --panel-edge:#22232a;
+    --led-on:#ff3a2f;
+    --led-on-soft: rgba(255,58,47,0.25);
+    --led-amber:#ffb000;
+    --led-off:#241a18;
+    --text:#e9e7e2;
+    --muted:#90909a;
+    --good:#37d67a;
+    --warn:#ffb000;
+    --blue:#3aa0ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 800px 500px at 50% -10%, rgba(255,58,47,0.08), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:28px 16px 60px;
+  }
+  .app{ width:100%; max-width:460px; }
+  header{ text-align:center; margin-bottom:22px; }
+  .eyebrow{
+    font-size:11px; letter-spacing:0.18em; color:var(--muted);
+    margin-bottom:10px; direction:ltr; text-transform:uppercase;
+  }
+  h1{
+    font-family:'Press Start 2P', monospace;
+    font-size:16px; line-height:1.7; color:var(--text);
+    margin:0 0 8px; text-shadow:0 0 18px rgba(255,58,47,0.35);
+  }
+  .sub{ font-size:13px; color:var(--muted); line-height:1.6; margin:0; }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--panel-edge);
+    border-radius:14px;
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 30px -18px rgba(0,0,0,0.6);
+  }
+  .sectionTitle{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:0.04em;
+    margin-bottom:10px;
+    text-align:center;
+  }
+
+  .camwrap{
+    position:relative; width:100%; aspect-ratio:1/1;
+    border-radius:10px; overflow:hidden; background:#000;
+    border:1px solid var(--panel-edge);
+  }
+  video{ width:100%; height:100%; object-fit:cover; display:block; }
+  video.flip-h{ transform: scaleX(-1); }
+  video.flip-v{ transform: scaleY(-1); }
+  video.flip-h.flip-v{ transform: scale(-1,-1); }
+
+  .gridoverlay{ position:absolute; inset:0; pointer-events:none; }
+  .gridoverlay .frame{
+    position:absolute; inset:8%;
+    border:1.5px dashed rgba(255,176,0,0.55);
+    border-radius:4px;
+  }
+  .gridoverlay .colmarks{
+    position:absolute; inset:8%;
+    display:grid; grid-template-columns:repeat(5,1fr); grid-template-rows:repeat(5,1fr);
+  }
+  .gridoverlay .colmarks div{
+    border-left:1px dashed rgba(120,255,170,0.2);
+    border-top:1px dashed rgba(120,255,170,0.2);
+  }
+  .gridoverlay .colmarks div:nth-child(5n+1){ border-left:none; }
+  .gridoverlay .colmarks div:nth-child(-n+5){ border-top:none; }
+
+  .orientrow{
+    display:flex; gap:10px; margin-top:12px; justify-content:center; flex-wrap:wrap;
+  }
+  .orientrow button{
+    flex:0 1 auto; min-width:0;
+    font-size:11.5px; padding:9px 12px;
+  }
+  .orientrow button.active{
+    border-color:#5cb6ff; color:#fff;
+    background: linear-gradient(180deg, #2a3a4a, #1b2530);
+  }
+
+  .debugcard{ display:none; }
+  .debugcard.show{ display:block; }
+  .debugcard canvas{
+    display:block; width:220px; height:220px;
+    margin:6px auto 10px; border-radius:8px; border:1px solid var(--panel-edge);
+    image-rendering:pixelated;
+    background:#000;
+  }
+  .debugnote{ text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
+  .debugnote b{ color:var(--text); }
+  .debugrow{
+    display:flex; justify-content:center; gap:18px; margin-top:8px;
+    font-size:10.5px; color:var(--muted); flex-wrap:wrap;
+  }
+  .legenddot{
+    display:inline-block; width:9px; height:9px; border-radius:50%;
+    margin-inline-end:5px; vertical-align:middle;
+  }
+  .legenddot.on{ background:#37d67a; }
+  .legenddot.off{ background:#ff5b4d; }
+
+  .camplaceholder{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; text-align:center; padding:24px;
+    color:var(--muted); font-size:12.5px; line-height:1.7;
+  }
+
+  .hint{
+    font-size:11.5px; color:var(--muted);
+    margin-top:10px; line-height:1.7; text-align:center;
+  }
+
+  .btnrow{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  button{
+    font-family: inherit; font-size:13px;
+    border-radius:9px; border:1px solid var(--panel-edge);
+    padding:13px 14px; cursor:pointer;
+    background:#1b1c22; color:var(--text);
+    flex:1; min-width:130px;
+    transition: transform 0.08s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  button:active{ transform: scale(0.97); }
+  button:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn-primary{
+    background: linear-gradient(180deg, #ff4133, #d62a1f);
+    border-color: #ff5b4d; color:#fff; font-weight:600;
+    box-shadow: 0 8px 18px -8px rgba(255,58,47,0.55);
+  }
+  .btn-sensors{
+    background: linear-gradient(180deg, #3aa0ff, #1a6fcc);
+    border-color: #5cb6ff; color:#fff; font-weight:600;
+    box-shadow: 0 8px 18px -8px rgba(58,160,255,0.5);
+  }
+  .btn-primary:hover, .btn-sensors:hover{ filter:brightness(1.05); }
+  .btn-ghost:hover{ border-color:#3a3b44; }
+  .chip{
+    font-size:11.5px; padding:9px 10px; flex:0 1 auto; min-width:0;
+  }
+
+  .resultcard{ display:none; }
+  .resultcard.show{ display:block; }
+
+  .matrix{
+    display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;
+    width:170px; margin:6px auto 18px;
+  }
+  .dot{
+    width:100%; aspect-ratio:1/1; border-radius:50%;
+    background: var(--led-off);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+  }
+  .dot.on{
+    background: radial-gradient(circle at 35% 30%, #ff8a6e, var(--led-on) 60%, #8c1c14 100%);
+    box-shadow: 0 0 10px 2px var(--led-on-soft), 0 0 22px 4px rgba(255,58,47,0.18);
+  }
+
+  .moodline{ text-align:center; margin-bottom:4px; }
+  .moodlabel{ font-family:'Press Start 2P', monospace; font-size:14px; letter-spacing:0.02em; }
+  .moodlabel.happy{ color: var(--good); text-shadow:0 0 14px rgba(55,214,122,0.35); }
+  .moodlabel.sad{ color: var(--led-on); text-shadow:0 0 14px rgba(255,58,47,0.35); }
+
+  .phrase{
+    text-align:center; font-size:13px; color:var(--muted);
+    direction:ltr; margin: 4px 0 14px; line-height:1.6;
+  }
+  .phrase b{ color:var(--text); }
+
+  .confidence{
+    text-align:center; font-size:11px; color:var(--muted);
+    margin-bottom:14px; direction:ltr;
+  }
+  .confidence.low{ color:var(--warn); }
+
+  .speakbar{
+    display:flex; align-items:center; justify-content:center;
+    gap:8px; margin-bottom:4px;
+  }
+  .pulse{ width:8px; height:8px; border-radius:50%; background:var(--muted); }
+  .pulse.live{
+    background:var(--led-amber);
+    box-shadow:0 0 10px 2px rgba(255,176,0,0.5);
+    animation: blink 0.9s ease-in-out infinite;
+  }
+  @keyframes blink{ 0%,100%{ opacity:1; } 50%{ opacity:0.25; } }
+
+  .status{
+    text-align:center; font-size:11.5px; color:var(--muted);
+    margin-top:10px; min-height:16px;
+  }
+  .status.err{ color:#ff8a80; }
+  .status.warn{ color:var(--warn); }
+
+  /* sensor columns display */
+  .sensors{
+    display:flex; justify-content:center; gap:28px;
+    margin: 8px auto 6px;
+  }
+  .sensorcol{ text-align:center; }
+  .sensoricon{ font-size:18px; margin-bottom:8px; }
+  .bar{
+    display:flex; flex-direction:column-reverse; gap:5px;
+    width:26px; margin:0 auto 8px;
+  }
+  .bar .seg{
+    width:100%; height:14px; border-radius:3px;
+    background: var(--led-off);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .bar .seg.on{
+    background: linear-gradient(180deg, #ff8a6e, var(--led-on));
+    box-shadow: 0 0 8px 1px var(--led-on-soft);
+  }
+  .sensorname{ font-size:10.5px; color:var(--muted); margin-bottom:2px; }
+  .sensorcount{ font-size:11px; color:var(--text); margin-bottom:6px; direction:ltr; }
+  .sensorphrase{ font-size:11px; color:var(--muted); direction:ltr; min-height:28px; }
+  .sensorphrase b{ color:var(--text); }
+
+  footer{
+    text-align:center; font-size:10.5px; color:#56565e;
+    margin-top:18px; line-height:1.8;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="eyebrow">microbit · mood + sensors</div>
+    <h1>קורא הרגשות<br>והחיישנים של המיקרוביט</h1>
+    <p class="sub">צילום מסך הסמיילי → חיווי על מצב הרוח. צילום מסך עמודות החיישנים → חיווי על אור, טמפרטורה ולחות, אחד אחרי השני.</p>
+  </header>
+
+  <div class="card" id="voiceTestCard">
+    <div class="sectionTitle">בדיקת קול מהירה — בלי מצלמה, בלי התקנה</div>
+    <div class="btnrow">
+      <button class="btn-ghost chip" id="t_happy">🙂 happy</button>
+      <button class="btn-ghost chip" id="t_sad">🙁 sad</button>
+      <button class="btn-ghost chip" id="t_dark">☀️&lt;4 dark</button>
+      <button class="btn-ghost chip" id="t_sun">☀️≥4 sun</button>
+      <button class="btn-ghost chip" id="t_cold">🌡️=2 cold</button>
+      <button class="btn-ghost chip" id="t_temphappy">🌡️=3 happy</button>
+      <button class="btn-ghost chip" id="t_burning">🌡️&gt;3 burning</button>
+      <button class="btn-ghost chip" id="t_thirsty">💧1-2 drink</button>
+      <button class="btn-ghost chip" id="t_likelife">💧=3 life</button>
+      <button class="btn-ghost chip" id="t_drowning">💧4-5 drowning</button>
+    </div>
+    <div class="status" id="voiceTestStatus"></div>
+  </div>
+
+  <div class="card">
+    <div class="camwrap" id="camwrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="gridoverlay" id="gridoverlay" style="display:none;">
+        <div class="colmarks"><div></div><div></div><div></div><div></div><div></div></div>
+        <div class="frame"></div>
+      </div>
+      <div class="camplaceholder" id="camplaceholder">
+        <div style="font-size:28px;">📷</div>
+        <div>יש לאשר גישה למצלמה כדי להתחיל.<br>מיקדו את מסך המיקרוביט בתוך המסגרת המנוקדת.</div>
+      </div>
+    </div>
+
+    <div class="orientrow" id="orientRow" style="display:none;">
+      <button class="btn-ghost" id="flipHBtn" type="button">↔️ הפוך אופקית</button>
+      <button class="btn-ghost" id="flipVBtn" type="button">↕️ הפוך אנכית</button>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn-ghost" id="startBtn">הפעל מצלמה</button>
+    </div>
+    <div class="btnrow">
+      <button class="btn-primary" id="captureMoodBtn" disabled>📷 צלם סמיילי (מצב רוח)</button>
+      <button class="btn-sensors" id="captureSensorsBtn" disabled>📊 צלם עמודות חיישנים</button>
+    </div>
+    <div class="hint">סמיילי: מסך עם פרצוף מחייך/עצוב. חיישנים: מסך עם 3 עמודות אור/טמפ׳/לחות. קרבו, יישרו והאירו טוב.<br>אם התמונה בדיבוג נראית הפוכה ביחס למיקרוביט האמיתי — השתמשו בכפתורי ההיפוך שמעל.</div>
+    <div class="status" id="camStatus"></div>
+  </div>
+
+  <div class="card debugcard" id="debugCard">
+    <div class="sectionTitle">דיבוג — מה בדיוק נותח</div>
+    <canvas id="debugCanvas" width="320" height="320"></canvas>
+    <div class="debugnote">זו התמונה שעליה רץ הזיהוי, עם רשת 5×5 ונקודות הדגימה.<br>
+      <span class="legenddot on"></span>דלוק &nbsp; <span class="legenddot off"></span>כבוי<br>
+      ודאו שכל נקודה יושבת בדיוק על נורה אחת במיקרוביט. אם לא — כוונו זום/מרחק, או השתמשו בכפתורי ההיפוך.
+    </div>
+    <div class="debugrow" id="debugStats"></div>
+  </div>
+
+  <div class="card resultcard" id="moodResultCard">
+    <div class="sectionTitle">תוצאת מצב הרוח</div>
+    <div class="matrix" id="matrix"></div>
+    <div class="moodline"><span class="moodlabel" id="moodLabel">—</span></div>
+    <div class="phrase" id="phraseLine"></div>
+    <div class="confidence" id="confidenceLine"></div>
+    <div class="speakbar">
+      <div class="pulse" id="moodPulse"></div>
+      <span style="font-size:11px;color:var(--muted);">קול</span>
+    </div>
+    <div class="btnrow">
+      <button class="btn-ghost" id="replayMoodBtn">השמע שוב</button>
+    </div>
+  </div>
+
+  <div class="card resultcard" id="sensorResultCard">
+    <div class="sectionTitle">תוצאת החיישנים (אור → טמפ׳ → לחות)</div>
+    <div class="sensors">
+      <div class="sensorcol">
+        <div class="sensoricon">☀️</div>
+        <div class="sensorname">אור</div>
+        <div class="bar" id="lightBar"></div>
+        <div class="sensorcount" id="lightCount">—</div>
+        <div class="sensorphrase" id="lightPhrase"></div>
+      </div>
+      <div class="sensorcol">
+        <div class="sensoricon">🌡️</div>
+        <div class="sensorname">טמפ׳</div>
+        <div class="bar" id="tempBar"></div>
+        <div class="sensorcount" id="tempCount">—</div>
+        <div class="sensorphrase" id="tempPhrase"></div>
+      </div>
+      <div class="sensorcol">
+        <div class="sensoricon">💧</div>
+        <div class="sensorname">לחות</div>
+        <div class="bar" id="humBar"></div>
+        <div class="sensorcount" id="humCount">—</div>
+        <div class="sensorphrase" id="humPhrase"></div>
+      </div>
+    </div>
+    <div class="speakbar">
+      <div class="pulse" id="sensorPulse"></div>
+      <span style="font-size:11px;color:var(--muted);">קול (ברצף)</span>
+    </div>
+    <div class="btnrow">
+      <button class="btn-ghost" id="replaySensorsBtn">השמע שוב ברצף</button>
+    </div>
+  </div>
+
+  <footer>נדרשת הרשאת מצלמה ודפדפן עם תמיכה ב‑Speech Synthesis.<br>הזיהוי מבוסס על ניתוח בהירות הנקודות בתמונה, לא על קישוריות למיקרוביט.</footer>
+</div>
+
+<script>
+(function(){
+  const video = document.getElementById('video');
+  const gridoverlay = document.getElementById('gridoverlay');
+  const camplaceholder = document.getElementById('camplaceholder');
+  const startBtn = document.getElementById('startBtn');
+  const captureMoodBtn = document.getElementById('captureMoodBtn');
+  const captureSensorsBtn = document.getElementById('captureSensorsBtn');
+  const camStatus = document.getElementById('camStatus');
+
+  const orientRow = document.getElementById('orientRow');
+  const flipHBtn = document.getElementById('flipHBtn');
+  const flipVBtn = document.getElementById('flipVBtn');
+
+  const debugCard = document.getElementById('debugCard');
+  const debugCanvas = document.getElementById('debugCanvas');
+  const debugCtx = debugCanvas.getContext('2d');
+  const debugStats = document.getElementById('debugStats');
+
+  const moodResultCard = document.getElementById('moodResultCard');
+  const matrixEl = document.getElementById('matrix');
+  const moodLabel = document.getElementById('moodLabel');
+  const phraseLine = document.getElementById('phraseLine');
+  const confidenceLine = document.getElementById('confidenceLine');
+  const moodPulse = document.getElementById('moodPulse');
+  const replayMoodBtn = document.getElementById('replayMoodBtn');
+
+  const sensorResultCard = document.getElementById('sensorResultCard');
+  const lightBar = document.getElementById('lightBar');
+  const tempBar = document.getElementById('tempBar');
+  const humBar = document.getElementById('humBar');
+  const lightCount = document.getElementById('lightCount');
+  const tempCount = document.getElementById('tempCount');
+  const humCount = document.getElementById('humCount');
+  const lightPhrase = document.getElementById('lightPhrase');
+  const tempPhrase = document.getElementById('tempPhrase');
+  const humPhrase = document.getElementById('humPhrase');
+  const sensorPulse = document.getElementById('sensorPulse');
+  const replaySensorsBtn = document.getElementById('replaySensorsBtn');
+
+  let lastMoodPhrase = '';
+  let lastSensorPhrases = [];
+  let flipH = false;
+  let flipV = false;
+
+  // Reference micro:bit 5x5 smiley patterns (row-major, 1 = lit)
+  // HAPPY matches the standard micro:bit MakeCode/MicroPython icon (Image.HAPPY).
+  // SAD was corrected to match an actual photo of this user's micro:bit —
+  // it draws two vertical "tear" lines under the eyes and a single dot
+  // below, not the inverted-arc mouth the previous version assumed.
+  // This mismatch was the root cause of the sad-smiley misdetection.
+  const HAPPY = [
+    0,0,0,0,0,
+    0,1,0,1,0,
+    0,0,0,0,0,
+    1,0,0,0,1,
+    0,1,1,1,0
+  ];
+  const SAD = [
+    0,0,0,0,0,
+    0,1,0,1,0,
+    0,1,0,1,0,
+    0,1,0,1,0,
+    0,0,1,0,0
+  ];
+
+  // build 25 mood dots + 5+5+5 bar segments once
+  for(let i=0;i<25;i++){
+    const d = document.createElement('div');
+    d.className = 'dot';
+    matrixEl.appendChild(d);
+  }
+  const dotEls = Array.from(matrixEl.children);
+
+  function buildBar(container){
+    for(let i=0;i<5;i++){
+      const s = document.createElement('div');
+      s.className = 'seg';
+      container.appendChild(s);
+    }
+    return Array.from(container.children);
+  }
+  const lightSegs = buildBar(lightBar);
+  const tempSegs = buildBar(tempBar);
+  const humSegs = buildBar(humBar);
+
+  function setStatus(msg, level){
+    camStatus.textContent = msg || '';
+    camStatus.className = 'status' + (level ? ' ' + level : '');
+  }
+
+  // ---------- orientation toggles ----------
+  function applyVideoTransform(){
+    video.classList.toggle('flip-h', flipH);
+    video.classList.toggle('flip-v', flipV);
+    flipHBtn.classList.toggle('active', flipH);
+    flipVBtn.classList.toggle('active', flipV);
+  }
+  flipHBtn.addEventListener('click', ()=>{ flipH = !flipH; applyVideoTransform(); });
+  flipVBtn.addEventListener('click', ()=>{ flipV = !flipV; applyVideoTransform(); });
+
+  async function startCamera(){
+    setStatus('מבקש הרשאת מצלמה…');
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width:{ideal:1280}, height:{ideal:1280} },
+        audio:false
+      });
+      video.srcObject = stream;
+      await video.play();
+      camplaceholder.style.display = 'none';
+      gridoverlay.style.display = 'block';
+      orientRow.style.display = 'flex';
+      captureMoodBtn.disabled = false;
+      captureSensorsBtn.disabled = false;
+      startBtn.textContent = 'מצלמה פעילה';
+      startBtn.disabled = true;
+      setStatus('');
+    }catch(err){
+      console.error(err);
+      setStatus('לא ניתן לגשת למצלמה. ודאו שהדפדפן קיבל הרשאה ונסו שוב.', 'err');
+    }
+  }
+  startBtn.addEventListener('click', startCamera);
+
+  // Capture a square crop of the live video into a canvas, applying the
+  // same h/v flips the user sees on screen so the analyzed image always
+  // matches what's displayed (and what the debug preview shows).
+  function captureSquareCanvas(){
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const s = 320;
+    const scale = Math.max(s/vw, s/vh);
+    const sw = s/scale;
+    const sh = s/scale;
+    const sx = (vw - sw)/2;
+    const sy = (vh - sh)/2;
+    const canvas = document.createElement('canvas');
+    canvas.width = s; canvas.height = s;
+    const ctx = canvas.getContext('2d');
+
+    ctx.save();
+    if(flipH || flipV){
+      ctx.translate(flipH ? s : 0, flipV ? s : 0);
+      ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+    }
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, s, s);
+    ctx.restore();
+
+    return {ctx, s};
+  }
+
+  // ---------- k-means (k=2) thresholding ----------
+  // Splits the 25 brightness samples into two clusters (lit / unlit) by
+  // their actual grouping rather than a fixed fraction of (max-min).
+  // This is far less sensitive to a single bright reflection or a single
+  // dark shadow skewing a simple range-based threshold.
+  function kmeans2(values){
+    let lo = Math.min(...values);
+    let hi = Math.max(...values);
+    if(hi - lo < 1e-6){
+      // no variation at all — everything looks the same
+      return { c0: lo, c1: hi, threshold: lo, separation: 0 };
+    }
+    let c0 = lo, c1 = hi;
+    for(let iter=0; iter<25; iter++){
+      let sum0=0, n0=0, sum1=0, n1=0;
+      for(const v of values){
+        if(Math.abs(v-c0) <= Math.abs(v-c1)){ sum0+=v; n0++; }
+        else { sum1+=v; n1++; }
+      }
+      const newC0 = n0 ? sum0/n0 : c0;
+      const newC1 = n1 ? sum1/n1 : c1;
+      if(Math.abs(newC0-c0) < 1e-4 && Math.abs(newC1-c1) < 1e-4){
+        c0 = newC0; c1 = newC1;
+        break;
+      }
+      c0 = newC0; c1 = newC1;
+    }
+    const lowC = Math.min(c0,c1);
+    const highC = Math.max(c0,c1);
+    return { c0:lowC, c1:highC, threshold:(lowC+highC)/2, separation: highC-lowC };
+  }
+
+  // returns {pattern[25] row-major 1/0, samples[25] {x,y,w,h,brightness},
+  //          threshold, separation, s}
+  function getBrightnessPattern(){
+    const {ctx, s} = captureSquareCanvas();
+    const margin = s * 0.08;
+    const inner = s - margin*2;
+    const cell = inner / 5;
+
+    const samples = [];
+    for(let row=0; row<5; row++){
+      for(let col=0; col<5; col++){
+        const cx0 = margin + col*cell;
+        const cy0 = margin + row*cell;
+        const pad = cell*0.28;
+        const px = Math.round(cx0+pad);
+        const py = Math.round(cy0+pad);
+        const pw = Math.max(2, Math.round(cell - pad*2));
+        const ph = pw;
+        let data;
+        try{ data = ctx.getImageData(px, py, pw, ph).data; }
+        catch(e){ data = ctx.getImageData(0,0,1,1).data; }
+        let sum=0, n=0;
+        for(let i=0;i<data.length;i+=4){
+          const r=data[i], g=data[i+1], b=data[i+2];
+          const lum = r*0.6 + g*0.25 + b*0.15; // weight red, microbit LEDs are red/orange
+          sum += lum; n++;
+        }
+        samples.push({ x:px, y:py, w:pw, h:ph, brightness: sum/n });
+      }
+    }
+
+    const brightnessValues = samples.map(p=>p.brightness);
+    const { threshold, separation } = kmeans2(brightnessValues);
+    const pattern = brightnessValues.map(v => v > threshold ? 1 : 0);
+
+    return { pattern, samples, threshold, separation, s, margin, cell };
+  }
+
+  function hamming(a,b){
+    let d=0;
+    for(let i=0;i<25;i++) if(a[i]!==b[i]) d++;
+    return d;
+  }
+
+  function matchMood(pattern){
+    const dHappy = hamming(pattern, HAPPY);
+    const dSad = hamming(pattern, SAD);
+    const mood = dHappy <= dSad ? 'happy' : 'sad';
+    const dist = mood === 'happy' ? dHappy : dSad;
+    const confidence = Math.round((1 - dist/25) * 100);
+    return { mood, confidence, dHappy, dSad };
+  }
+
+  // column index in row-major 5x5: cell(row,col) = row*5+col
+  function columnCells(pattern, col){
+    const arr=[];
+    for(let row=0; row<5; row++) arr.push(pattern[row*5+col]);
+    return arr; // top..bottom
+  }
+
+  // Confirmed mapping (user-verified against physical device):
+  // rightmost column = light, middle column = temperature, leftmost column = humidity.
+  // "Rightmost/leftmost" here means as the user sees the micro:bit with their own eyes —
+  // this is only correct once the captured pattern matches that view, which is what
+  // the flip-H/flip-V buttons and the labeled debug overlay below are for.
+  const COL_LIGHT = 4;
+  const COL_TEMP  = 2;
+  const COL_HUM   = 0;
+
+  function lightPhraseFor(n){ return n < 4 ? "im in the dark my friend" : "nice sun man"; }
+  function tempPhraseFor(n){
+    if(n <= 2) return "wow im cold";
+    if(n === 3) return "im so happy";
+    return "im burning here";
+  }
+  function humPhraseFor(n){
+    if(n <= 2) return "i need a drink";
+    if(n === 3) return "i like my life";
+    return "im drowning";
+  }
+
+  function renderPattern(pattern){
+    dotEls.forEach((d,i)=> d.classList.toggle('on', !!pattern[i]));
+  }
+  function renderBar(segs, cells){
+    // cells is top..bottom; bars fill bottom-up visually via column-reverse,
+    // so seg[0] (first child, bottom after reverse) maps to bottom row (index4)
+    const bottomUp = cells.slice().reverse(); // bottom..top
+    segs.forEach((seg,i)=> seg.classList.toggle('on', !!bottomUp[i]));
+  }
+
+  // ---------- live debug preview ----------
+  function renderDebug(result, mode){
+    const { samples, pattern, s, margin, cell, threshold, separation } = result;
+
+    debugCanvas.width = s;
+    debugCanvas.height = s;
+    // redraw the exact analyzed square (re-capture would re-read the video,
+    // so instead we re-render from the same canvas the analysis used)
+    debugCtx.drawImage(result.sourceCanvas, 0, 0);
+
+    // grid lines
+    debugCtx.strokeStyle = 'rgba(255,176,0,0.55)';
+    debugCtx.lineWidth = 1.5;
+    debugCtx.setLineDash([4,3]);
+    debugCtx.strokeRect(margin, margin, s - margin*2, s - margin*2);
+    for(let i=1;i<5;i++){
+      const x = margin + cell*i;
+      debugCtx.beginPath(); debugCtx.moveTo(x, margin); debugCtx.lineTo(x, s-margin); debugCtx.stroke();
+      const y = margin + cell*i;
+      debugCtx.beginPath(); debugCtx.moveTo(margin, y); debugCtx.lineTo(s-margin, y); debugCtx.stroke();
+    }
+    debugCtx.setLineDash([]);
+
+    // sample boxes colored by detected on/off
+    samples.forEach((p, i)=>{
+      const on = !!pattern[i];
+      debugCtx.strokeStyle = on ? '#37d67a' : '#ff5b4d';
+      debugCtx.lineWidth = 2;
+      debugCtx.strokeRect(p.x, p.y, p.w, p.h);
+    });
+
+    // in sensor mode, label which column the app reads as light/temp/humidity
+    // so a mapping problem is visible immediately, not just heard after the fact
+    if(mode === 'sensors'){
+      const colLabel = { [COL_LIGHT]: 'אור ☀️', [COL_TEMP]: 'טמפ׳ 🌡️', [COL_HUM]: 'לחות 💧' };
+      debugCtx.font = '12px ui-monospace, monospace';
+      debugCtx.textAlign = 'center';
+      for(let col=0; col<5; col++){
+        const label = colLabel[col];
+        if(!label) continue;
+        const cx = margin + cell*col + cell/2;
+        const y = s - margin*0.32;
+        debugCtx.fillStyle = 'rgba(0,0,0,0.65)';
+        const textW = debugCtx.measureText(label).width;
+        debugCtx.fillRect(cx - textW/2 - 4, y - 12, textW + 8, 16);
+        debugCtx.fillStyle = '#ffd166';
+        debugCtx.fillText(label, cx, y);
+      }
+      debugCtx.textAlign = 'left';
+    }
+
+    const sepTxt = separation < 12
+      ? '⚠️ הפרדה נמוכה (' + separation.toFixed(1) + ') — קרבו/האירו'
+      : 'הפרדה: ' + separation.toFixed(1);
+    debugStats.innerHTML =
+      '<span>סף: ' + threshold.toFixed(1) + '</span>' +
+      '<span>' + sepTxt + '</span>';
+
+    debugCard.classList.add('show');
+  }
+
+  function speakNow(text, pulseEl, onEndCb){
+    if(!('speechSynthesis' in window)){
+      setStatus('הדפדפן לא תומך בהשמעה קולית.', 'err');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = 0.98; u.pitch = 1.0;
+    u.onstart = ()=> pulseEl && pulseEl.classList.add('live');
+    u.onend = ()=> { pulseEl && pulseEl.classList.remove('live'); if(onEndCb) onEndCb(); };
+    u.onerror = ()=> { pulseEl && pulseEl.classList.remove('live'); if(onEndCb) onEndCb(); };
+    window.speechSynthesis.speak(u);
+  }
+
+  function speakSequence(texts, pulseEl){
+    if(!('speechSynthesis' in window)){
+      setStatus('הדפדפן לא תומך בהשמעה קולית.', 'err');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    let i = 0;
+    function next(){
+      if(i >= texts.length) return;
+      const text = texts[i++];
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US'; u.rate = 0.98; u.pitch = 1.0;
+      u.onstart = ()=> pulseEl && pulseEl.classList.add('live');
+      u.onend = ()=> { pulseEl && pulseEl.classList.remove('live'); next(); };
+      u.onerror = ()=> { pulseEl && pulseEl.classList.remove('live'); next(); };
+      window.speechSynthesis.speak(u);
+    }
+    next();
+  }
+
+  function showMoodResult(result){
+    const { pattern, separation } = result;
+    moodResultCard.classList.add('show');
+    renderPattern(pattern);
+    const m = matchMood(pattern);
+    const isHappy = m.mood === 'happy';
+    moodLabel.textContent = isHappy ? 'HAPPY 🙂' : 'SAD 🙁';
+    moodLabel.className = 'moodlabel ' + (isHappy ? 'happy' : 'sad');
+    const phrase = isHappy ? "its all good my friend" : "take care of me my friend";
+    lastMoodPhrase = phrase;
+    phraseLine.innerHTML = 'נשמע: <b>"' + phrase + '"</b>';
+    confidenceLine.textContent = 'דיוק התאמה: ' + m.confidence + '%  ·  מרחק לדפוס שמח/עצוב: ' + m.dHappy + ' / ' + m.dSad;
+    confidenceLine.className = 'confidence' + (m.confidence < 70 ? ' low' : '');
+    speakNow(phrase, moodPulse);
+    moodResultCard.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  function showSensorResult(result){
+    const { pattern } = result;
+    sensorResultCard.classList.add('show');
+
+    const lightCells = columnCells(pattern, COL_LIGHT); // rightmost column = light
+    const tempCells  = columnCells(pattern, COL_TEMP);  // middle column = temperature
+    const humCells   = columnCells(pattern, COL_HUM);   // leftmost column = humidity
+
+    const lightN = lightCells.reduce((a,b)=>a+b,0);
+    const tempN  = tempCells.reduce((a,b)=>a+b,0);
+    const humN   = humCells.reduce((a,b)=>a+b,0);
+
+    renderBar(lightSegs, lightCells);
+    renderBar(tempSegs, tempCells);
+    renderBar(humSegs, humCells);
+
+    const pLight = lightPhraseFor(lightN);
+    const pTemp  = tempPhraseFor(tempN);
+    const pHum   = humPhraseFor(humN);
+
+    lightCount.textContent = lightN + ' / 5 נורות';
+    tempCount.textContent  = tempN + ' / 5 נורות';
+    humCount.textContent   = humN + ' / 5 נורות';
+
+    lightPhrase.innerHTML = '<b>"' + pLight + '"</b>';
+    tempPhrase.innerHTML  = '<b>"' + pTemp + '"</b>';
+    humPhrase.innerHTML   = '<b>"' + pHum + '"</b>';
+
+    lastSensorPhrases = [pLight, pTemp, pHum];
+    speakSequence(lastSensorPhrases, sensorPulse);
+    sensorResultCard.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // shared capture+analyze+debug step used by both buttons
+  function captureAndAnalyze(){
+    const {ctx, s} = captureSquareCanvas();
+    // re-run the same crop logic but keep the source canvas for debug drawing
+    // (captureSquareCanvas already drew into ctx's canvas — grab it)
+    const sourceCanvas = ctx.canvas;
+
+    const margin = s * 0.08;
+    const inner = s - margin*2;
+    const cell = inner / 5;
+
+    const samples = [];
+    for(let row=0; row<5; row++){
+      for(let col=0; col<5; col++){
+        const cx0 = margin + col*cell;
+        const cy0 = margin + row*cell;
+        const pad = cell*0.28;
+        const px = Math.round(cx0+pad);
+        const py = Math.round(cy0+pad);
+        const pw = Math.max(2, Math.round(cell - pad*2));
+        const ph = pw;
+        let data;
+        try{ data = ctx.getImageData(px, py, pw, ph).data; }
+        catch(e){ data = ctx.getImageData(0,0,1,1).data; }
+        let sum=0, n=0;
+        for(let i=0;i<data.length;i+=4){
+          const r=data[i], g=data[i+1], b=data[i+2];
+          const lum = r*0.6 + g*0.25 + b*0.15;
+          sum += lum; n++;
+        }
+        samples.push({ x:px, y:py, w:pw, h:ph, brightness: sum/n });
+      }
+    }
+
+    const brightnessValues = samples.map(p=>p.brightness);
+    const { threshold, separation } = kmeans2(brightnessValues);
+    const pattern = brightnessValues.map(v => v > threshold ? 1 : 0);
+
+    return { pattern, samples, threshold, separation, s, margin, cell, sourceCanvas };
+  }
+
+  function runCapture(kind){
+    if(!video.videoWidth){ setStatus('המצלמה עוד לא מוכנה, נסו שוב בעוד שנייה.', 'err'); return; }
+    const result = captureAndAnalyze();
+
+    renderDebug(result, kind);
+
+    if(result.separation < 12){
+      setStatus('לא הצלחתי לראות הבדל בהירות ברור בין הנורות — קרבו, האירו טוב את המסך והימנעו מהשתקפויות, ואז צלמו שוב. בדקו את תצוגת הדיבוג למטה.', 'warn');
+    } else {
+      setStatus('');
+    }
+
+    if(kind === 'mood') showMoodResult(result);
+    else showSensorResult(result);
+  }
+
+  captureMoodBtn.addEventListener('click', ()=> runCapture('mood'));
+  captureSensorsBtn.addEventListener('click', ()=> runCapture('sensors'));
+
+  replayMoodBtn.addEventListener('click', ()=>{ if(lastMoodPhrase) speakNow(lastMoodPhrase, moodPulse); });
+  replaySensorsBtn.addEventListener('click', ()=>{ if(lastSensorPhrases.length) speakSequence(lastSensorPhrases, sensorPulse); });
+
+  // quick voice test chips
+  const testMap = {
+    t_happy: "its all good my friend",
+    t_sad: "take care of me my friend",
+    t_dark: "im in the dark my friend",
+    t_sun: "nice sun man",
+    t_cold: "wow im cold",
+    t_temphappy: "im so happy",
+    t_burning: "im burning here",
+    t_thirsty: "i need a drink",
+    t_likelife: "i like my life",
+    t_drowning: "im drowning"
+  };
+  const voiceTestStatus = document.getElementById('voiceTestStatus');
+  Object.keys(testMap).forEach(id=>{
+    document.getElementById(id).addEventListener('click', ()=>{
+      voiceTestStatus.textContent = 'משמיע…';
+      voiceTestStatus.className = 'status';
+      speakNow(testMap[id], null);
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
